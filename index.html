@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style></style>
+</head>
+<body>
+<svg></svg>
+<div id="tooltip"></div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+
+<script>
+
+let width = 1280, height = 700;
+
+let svg = d3.select("svg")
+    .attr("viewBox", "0 0 " + width + " " + height)
+
+// Load external data
+Promise.all([d3.json("https://chi-loong.github.io/CSC3007/assignments/links-sample.json"), d3.json( "https://chi-loong.github.io/CSC3007/assignments/cases-sample.json")]).then(data => {
+
+// Data preprocessing
+    data[0].forEach(e => {
+        e.source = e.infector;
+        e.target = e.infectee;
+    });
+
+    let genderColor =  {"male": "#74b9ff", "female": "#fab1a0"} ;
+
+    const tooltip = d3.select("#tooltip")
+    .append("div")
+    .attr("class", "valueTooltip")
+    .style("position", "absolute")
+    .style("z-index", "10")
+    .style("visibility", "hidden")
+    .style("padding", "15px")
+    .style("background", "#b2bec3")
+    .style("border-radius", "5px")
+    .style("color", "#2d3436");
+
+    let node = svg.append("g")
+        .attr("id", "nodes")
+        .selectAll("circle")
+        .data(data[1])
+        .enter()
+            .append("circle")
+            .attr("r", 25)
+            .attr("fill",function(d,i){
+                return genderColor[d.gender];
+            })
+            .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended))
+            .on('mouseover', function (event, d) {
+                tooltip.html(
+                    "Gender: " + d.gender +
+                    "<br >Age: " + d.age + 
+                    "<br >Occupation: " + d.occupation + 
+                    "<br>Vaccinated? " + d.vaccinated
+                ).style("visibility", "visible");   
+
+                d3.select(this).transition()
+                    .style('stroke', '#2d3436')
+                    .style('stroke-width', '1px');            
+            })
+            .on("mousemove", function (event) {
+                tooltip
+                    .style("top", event.pageY - 10 + "px")
+                    .style("left", event.pageX + 10 + "px");
+            })
+            .on('mouseout', function (event) {
+                tooltip
+                    .html("")
+                    .style("visibility", "hidden"); 
+
+                d3.select(this).transition()
+                    .style('stroke', '#2d3436')
+                    .style('stroke-width', '0px');   
+            });
+
+    let image = node.append("image")
+        .attr("xlink:href", function(d) {
+            if (d.gender == "male") return "image/male.png"; else return "image/female.png";
+        })
+        .attr("width", 10)
+        .attr("height", 10)
+        .attr("pointer-events", "none");
+
+    let linkpath = svg.append("g")
+        .attr("id", "links")
+        .selectAll("path")
+        .data(data[0])
+        .enter()
+            .append("path")
+            .attr("fill", "none")
+            .attr("stroke", "#2d3436")
+            .style( "stroke-width", 0.7);
+
+    let simulation = d3.forceSimulation()
+        .nodes(data[1])
+    .force("x", d3.forceX().strength(0.1).x( width / 2 ))
+    .force("y", d3.forceY().strength(0.1).y( height /2 ))
+    .force("link", d3.forceLink(data[0]).id(d => d.id))
+    .force("charge", d3.forceManyBody().strength(-200))
+    .force("collide", d3.forceCollide().strength(0.1).radius(30))
+    .on("tick", d => {
+        node
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+        linkpath
+        .attr("d", d => "M" + d.source.x + "," + d.source.y + " " + d.target.x + "," + d.target.y);
+        image
+        .attr("x", d => d.x - 7.5)
+        .attr("y", d => d.y - 7.5);
+    });
+
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    var colorScale = d3
+        .scaleOrdinal()
+        .domain(["Male", "Female"])
+        .range(["#74b9ff", "#fab1a0"]);
+
+    var legend = d3.legendColor()
+        .scale(colorScale)
+
+    svg.append("g")
+        .attr("transform", "translate(300,20)")
+        .call(legend);
+
+
+    console.log(data[0]); //links
+    console.log(data[1]); //cases
+
+})
+</script>
+
+</body>
+</html>
